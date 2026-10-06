@@ -1,0 +1,76 @@
+name: Build Desktop Installers (Windows & macOS)
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [ main, master ]
+    tags:
+      - 'v*'
+
+jobs:
+  build-macos:
+    name: Build macOS DMG
+    runs-on: macos-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.16.5'
+          channel: 'stable'
+          cache: true
+
+      - name: Install dependencies
+        run: flutter pub get
+
+      - name: Build macOS App
+        run: flutter build macos --release
+
+      - name: Package macOS DMG
+        run: |
+          mkdir -p dist/macos_staging
+          cp -R build/macos/Build/Products/Release/nempresarial.app dist/macos_staging/
+          ln -s /Applications dist/macos_staging/Applications
+          hdiutil create -volname "Nubiko Empresarial" -srcfolder dist/macos_staging -ov -format UDZO dist/Nubiko_Empresarial_macOS.dmg
+          rm -rf dist/macos_staging
+
+      - name: Upload macOS DMG
+        uses: actions/upload-artifact@v4
+        with:
+          name: Nubiko-Empresarial-macOS-DMG
+          path: dist/Nubiko_Empresarial_macOS.dmg
+
+  build-windows:
+    name: Build Windows Installer (.exe)
+    runs-on: windows-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.16.5'
+          channel: 'stable'
+          cache: true
+
+      - name: Install Inno Setup
+        run: choco install innosetup -y
+
+      - name: Install dependencies
+        run: flutter pub get
+
+      - name: Build Windows App
+        run: flutter build windows --release
+
+      - name: Package with Inno Setup
+        run: |
+          & "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" windows\installer\nempresarial_setup.iss
+
+      - name: Upload Windows Installer
+        uses: actions/upload-artifact@v4
+        with:
+          name: Nubiko-Empresarial-Windows-Installer
+          path: dist/Nubiko_Empresarial_Setup_Windows.exe
